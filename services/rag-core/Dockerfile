@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 # --- development image: full deps (incl. dev group), live-reload ---
 FROM base AS dev
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv sync --frozen --no-install-project
 # Pre-warm fastembed's local BM25 tokenizer asset (Stage 5 hybrid retrieval) at
 # build time - it's a tiny (~KB) tokenizer/stopword file from Hugging Face, not
@@ -29,7 +29,7 @@ CMD ["uv", "run", "--frozen", "uvicorn", "app.main:app", "--host", "0.0.0.0", "-
 
 # --- production image: runtime deps only, run the venv binary directly ---
 FROM base AS prod
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv sync --frozen --no-install-project --no-dev
 RUN uv run python -c "from fastembed import SparseTextEmbedding; SparseTextEmbedding('Qdrant/bm25')"
 COPY app ./app
