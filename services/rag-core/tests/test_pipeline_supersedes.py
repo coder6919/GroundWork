@@ -46,6 +46,9 @@ class _FakeQdrantClient:
     def set_payload(self, collection_name, payload, points, **kwargs):
         self.set_payload_calls.append((payload, points))
 
+    def count(self, collection_name, exact=True):
+        return SimpleNamespace(count=len(self.upserted_points))
+
 
 @pytest.fixture(autouse=True)
 def _patch_qdrant(monkeypatch):
@@ -137,4 +140,63 @@ def test_schema_migration_clears_stale_registry_rows_before_reingesting(
 
     assert outdated_client.deleted_collections == [settings.qdrant_collection]
     assert second[0].skipped_duplicate is False
+    assert len(registry.list()) == 1
+
+
+def test_pointing_at_a_different_empty_collection_also_clears_a_stale_registry(
+    tmp_path: Path, monkeypatch
+):
+    """Regression test: live-caught pointing rag-core at a brand-new Qdrant
+    Cloud cluster while the local SQLite registry still had rows from an
+    earlier ingest into local Qdrant. ensure_hybrid_collection only reports
+    "recreated" when it drops an outdated SAME collection - a collection
+    that's simply new on this target (never existed here) returns False, so
+    the old schema-migration-only check missed this case entirely:
+    POST /internal/ingest reported every file "skipped_duplicate": true
+    against a collection that stayed at 0 points. Any 0-point collection
+    must never be trusted to match a non-empty registry, regardless of why
+    they diverged."""
+    _write(tmp_path / "doc.md", "# Doc\n\nOriginal content.")
+    settings = Settings(sqlite_path=str(tmp_path / "registry.db"), storage_dir=str(tmp_path / "storage"))
+    registry = SQLiteDocumentRegistry(settings.sqlite_path)
+
+    first_client = _FakeQdrantClient(existing_vectors=None)
+    monkeypatch.setattr("app.ingestion.pipeline.make_client", lambda timeout=30.0: first_client)
+    first = ingest_path(tmp_path, settings=settings, registry=registry, embedder=_FakeEmbedder())
+    assert first[0].skipped_duplicate is False
+    assert len(registry.list()) == 1
+
+    # A different Qdrant target (e.g. a fresh cloud cluster) - the collection
+    # doesn't exist there yet either, so ensure_hybrid_collection reports
+    # False (not "recreated"), same as any brand-new collection.
+    new_target_client = _FakeQdrantClient(existing_vectors=None)
+    monkeypatch.setattr("app.ingestion.pipeline.make_client", lambda timeout=30.0: new_target_client)
+    second = ingest_path(tmp_path, settings=settings, registry=registry, embedder=_FakeEmbedder())
+
+    assert second[0].skipped_duplicate is False
+    assert len(new_target_client.upserted_points) > 0
+    assert len(registry.list()) == 1
+
+
+def test_a_populated_collection_on_a_new_target_is_left_alone(tmp_path: Path, monkeypatch):
+    """The new empty-collection check must not fire when the target
+    collection is new to ensure_hybrid_collection's eyes but already has
+    points (e.g. a second rag-core instance pointed at a Qdrant that
+    already has real data) - only a genuinely empty collection is
+    grounds for distrusting the registry."""
+    _write(tmp_path / "doc.md", "# Doc\n\nOriginal content.")
+    settings = Settings(sqlite_path=str(tmp_path / "registry.db"), storage_dir=str(tmp_path / "storage"))
+    registry = SQLiteDocumentRegistry(settings.sqlite_path)
+
+    first_client = _FakeQdrantClient(existing_vectors=None)
+    monkeypatch.setattr("app.ingestion.pipeline.make_client", lambda timeout=30.0: first_client)
+    ingest_path(tmp_path, settings=settings, registry=registry, embedder=_FakeEmbedder())
+    assert len(registry.list()) == 1
+
+    already_populated_client = _FakeQdrantClient(existing_vectors={"dense": object()})
+    already_populated_client.upserted_points = list(first_client.upserted_points)
+    monkeypatch.setattr("app.ingestion.pipeline.make_client", lambda timeout=30.0: already_populated_client)
+    second = ingest_path(tmp_path, settings=settings, registry=registry, embedder=_FakeEmbedder())
+
+    assert second[0].skipped_duplicate is True
     assert len(registry.list()) == 1

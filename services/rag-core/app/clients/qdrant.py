@@ -16,6 +16,7 @@ from qdrant_client.models import (
     Filter,
     MatchValue,
     Modifier,
+    PayloadSchemaType,
     PointStruct,
     SparseVectorParams,
     VectorParams,
@@ -50,6 +51,37 @@ def ensure_collection(client: QdrantClient, name: str, dimensions: int) -> None:
         log.info("qdrant_collection_created", collection=name, dimensions=dimensions)
 
 
+# Every payload field ever used in a FieldCondition filter (see
+# retrieval/search.py's _build_filter and mark_superseded/delete_document_points
+# below) needs an explicit payload index. Self-hosted Qdrant (pinned
+# qdrant/qdrant:v1.19.0 locally) allows filtering unindexed fields via a full
+# scan; Qdrant Cloud does not - live-caught deploying to Qdrant Cloud, every
+# ingest failed with "Index required but not found for \"doc_id\"" on the
+# very first delete_document_points call. `superseded` is excluded by
+# default on every search unless include_superseded=True, so this isn't an
+# edge case - it's the hot path.
+_PAYLOAD_INDEXES: dict[str, PayloadSchemaType] = {
+    "doc_id": PayloadSchemaType.KEYWORD,
+    "source_filename": PayloadSchemaType.KEYWORD,
+    "doc_version": PayloadSchemaType.KEYWORD,
+    "ingested_at": PayloadSchemaType.DATETIME,
+    "superseded": PayloadSchemaType.BOOL,
+}
+
+
+def _ensure_payload_indexes(client: QdrantClient, name: str) -> None:
+    """Idempotent - creating an index that already exists is a no-op on
+    Qdrant's side. Called unconditionally (not just on fresh collection
+    creation) so an existing collection that predates this fix - e.g. one
+    already deployed - gets backfilled on its next ingest rather than
+    needing a one-off migration script."""
+    for field_name, schema in _PAYLOAD_INDEXES.items():
+        try:
+            client.create_payload_index(collection_name=name, field_name=field_name, field_schema=schema)
+        except Exception as exc:  # noqa: BLE001 - never let index bookkeeping break ingestion
+            log.warning("qdrant_payload_index_failed", collection=name, field=field_name, error=str(exc))
+
+
 def ensure_hybrid_collection(client: QdrantClient, name: str, dimensions: int) -> bool:
     """Idempotent: creates a named dense+sparse collection for hybrid retrieval.
     Returns True if an existing collection had to be dropped and recreated
@@ -66,6 +98,7 @@ def ensure_hybrid_collection(client: QdrantClient, name: str, dimensions: int) -
     if client.collection_exists(name):
         vectors = client.get_collection(name).config.params.vectors
         if isinstance(vectors, dict) and DENSE_VECTOR_NAME in vectors:
+            _ensure_payload_indexes(client, name)
             return False  # already the current hybrid schema
         log.warning("qdrant_collection_schema_outdated_recreating", collection=name)
         client.delete_collection(name)
@@ -79,6 +112,7 @@ def ensure_hybrid_collection(client: QdrantClient, name: str, dimensions: int) -
         sparse_vectors_config={SPARSE_VECTOR_NAME: SparseVectorParams(modifier=Modifier.IDF)},
     )
     log.info("qdrant_hybrid_collection_created", collection=name, dimensions=dimensions)
+    _ensure_payload_indexes(client, name)
     return recreated
 
 

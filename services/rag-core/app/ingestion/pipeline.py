@@ -94,6 +94,22 @@ def ingest_path(
         # content-hash dedup check must not be allowed to skip anything.
         log.warning("registry_cleared_after_schema_migration", collection=settings.qdrant_collection)
         registry.clear()
+    elif registry.list():
+        # ensure_hybrid_collection only reports True when it had to drop and
+        # recreate the SAME collection - a collection that's simply new on
+        # this target (never existed here before) returns False, which would
+        # otherwise let a pre-existing registry's "already ingested" rows
+        # silently skip re-ingesting into a collection that has none of
+        # their points. Live-caught pointing rag-core at a fresh Qdrant
+        # Cloud cluster while the local SQLite registry still had rows from
+        # ingesting into local Qdrant: POST /internal/ingest reported 8/8
+        # "skipped_duplicate": true against a brand-new empty collection,
+        # which stayed at 0 points. A collection with 0 points can never
+        # legitimately match a non-empty registry, regardless of why.
+        point_count = client.count(collection_name=settings.qdrant_collection, exact=True).count
+        if point_count == 0:
+            log.warning("registry_cleared_empty_collection_mismatch", collection=settings.qdrant_collection)
+            registry.clear()
 
     supersedes_norm = {_normalize_rel(k): _normalize_rel(v) for k, v in (supersedes or {}).items()}
     versions_norm = {_normalize_rel(k): v for k, v in (versions or {}).items()}
