@@ -1,0 +1,21 @@
+RAG Knowledge Agent
+Copyright 2026 the RAG Knowledge Agent authors
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This is a portfolio / reference implementation.
+
+--------------------------------------------------------------------------------
+Demo corpus (fetched at runtime by scripts/fetch_corpus.py — NOT distributed
+with this repository):
+
+  * Portions derived from the GitLab Handbook and GitLab Documentation,
+    licensed under CC BY-SA 4.0.
+    https://handbook.gitlab.com  |  https://docs.gitlab.com
+
+  * Supplemental U.S. Government publications — public domain
+    (17 U.S.C. Section 105).
+
+See corpus/manifest.yaml for the authoritative per-source list and licenses.
+Any redistribution of corpus content remains subject to that content's own
+license, independent of this repository's Apache-2.0 license.

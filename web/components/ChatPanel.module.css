@@ -1,0 +1,143 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.empty {
+  padding: var(--space-lg);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-2);
+}
+
+.emptyLede {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.samples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-start;
+}
+
+.sample {
+  background: none;
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-control);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--dur-short) var(--ease-out),
+    color var(--dur-short) var(--ease-out);
+}
+
+.sample:hover {
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.sample:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.message {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-card);
+}
+
+.user {
+  background: var(--color-paper-2);
+  align-self: flex-end;
+  max-width: 34rem;
+  margin-left: auto;
+}
+
+.assistant {
+  border: 1px solid var(--color-rule);
+}
+
+.roleLabel {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-xs);
+}
+
+.text {
+  white-space: pre-wrap;
+  color: var(--color-ink-2);
+  margin: 0 0 var(--space-sm);
+}
+
+.message:last-child .text {
+  margin-bottom: 0;
+}
+
+.caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  background: var(--color-accent);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
+
+.form {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-end;
+  position: sticky;
+  bottom: var(--space-md);
+}
+
+.input {
+  flex: 1;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-control);
+  padding: 0.7rem 0.9rem;
+  max-height: 8rem;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}

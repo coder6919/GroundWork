@@ -1,0 +1,11 @@
+# Normalize to LF everywhere - the backend code and shell scripts run in Linux
+# containers and CI regardless of the host OS.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+
+# Windows-only helpers keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf

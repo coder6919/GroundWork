@@ -1,0 +1,80 @@
+# Base (production-shaped) compose. `docker-compose.override.yml` adds dev-only
+# conveniences (localhost port maps, bind mounts, hot reload) and is applied
+# automatically by `docker compose`.
+#
+# Trust boundary: only `api` is intended to be internet-facing. `rag-core` and
+# `qdrant` sit on the private `ragnet` network and expose no host ports here.
+name: rag-agent
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.0
+    restart: unless-stopped
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - ragnet
+
+  rag-core:
+    build:
+      context: ./services/rag-core
+      target: prod
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ENV: ${ENV:-development}
+    volumes:
+      - rag_core_data:/app/data
+    depends_on:
+      qdrant:
+        condition: service_started
+    networks:
+      - ragnet
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').getcode()==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  api:
+    build:
+      context: ./services/api
+      target: prod
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ENV: ${ENV:-development}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      rag-core:
+        condition: service_healthy
+    networks:
+      - ragnet
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+networks:
+  ragnet:
+    driver: bridge
+
+volumes:
+  qdrant_storage:
+  rag_core_data:

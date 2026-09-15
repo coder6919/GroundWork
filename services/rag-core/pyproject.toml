@@ -1,0 +1,60 @@
+[project]
+name = "rag-core"
+version = "0.0.0"
+description = "RAG Knowledge Agent - Python AI core (ingestion, retrieval, generation)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "httpx>=0.27",
+    "qdrant-client>=1.12",
+    "structlog>=24.4",
+    "llama-index-core>=0.14.24",
+    "voyageai>=0.5.0",
+    "charset-normalizer>=3.5.1",
+    "tiktoken>=0.14.0",
+    "anthropic>=1.5.0",
+    "pdfplumber>=0.11.10",
+    "pypdfium2>=5.13.0",
+    "pytesseract>=0.3.13",
+    "pillow>=12.3.0",
+    "fastembed>=0.4.2",
+    "cohere>=5.13.0",
+    "python-multipart>=0.0.12",  # required by FastAPI's UploadFile (Stage 9)
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "reportlab>=5.0.1",
+    "ruff>=0.7",
+    # Stage 8 eval only - never needed by the running service, kept out of the
+    # prod image (`uv sync --no-dev`) to avoid bloating it with pandas/pyarrow/etc.
+    "ragas>=0.4.3",
+    # Pinned: ragas 0.4.3 eagerly imports ChatVertexAI from langchain-community,
+    # which langchain-community>=0.4 restructured away - breaks the import
+    # entirely regardless of which provider you actually use. Verified by
+    # installing both versions directly, not assumed.
+    "langchain-community<0.4",
+    # LiteLLMEmbeddings (ragas) wraps Voyage via litellm's "voyage/<model>"
+    # provider prefix - reuses our existing VOYAGE_API_KEY for Ragas'
+    # AnswerRelevancy metric instead of adding OpenAI as a new paid provider.
+    "litellm>=1.60",
+    "pyyaml>=6.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires external services (Qdrant reachable; some tests also need VOYAGE_API_KEY)",
+]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,11 @@
+New hires often ask where to find the employee handbook. It lives on the
+internal wiki under Company > Policies, and is also linked from the welcome
+email sent on day one.
+
+For laptop setup, IT provisions new machines within the first 48 hours of a
+start date. If you have not received a laptop invite by day two, contact
+it-support@example.com rather than waiting.
+
+Payroll runs on the last business day of each month. Direct deposit changes
+must be submitted at least five business days before a pay run to take effect
+in that cycle.

@@ -1,0 +1,149 @@
+# Render Blueprint (Stage 11 deploy) for rag-core + api.
+#
+# Cost note: Render's private-service type (pserv) has no free instance -
+# it requires paid compute. To stay at $0, rag-core deploys as a public
+# `web` service instead of the private service DIRECTION.md's architecture
+# originally called for ("rag-core and qdrant are never exposed to the
+# public internet"). The actual protection is unchanged either way: every
+# /internal/* route still fail-closes on a missing/wrong X-Internal-Secret
+# header (see app/security.py) - only /health and /ready are intentionally
+# open, and neither leaks anything beyond a boolean status. Documented as a
+# known trade-off, not a silent downgrade - see README's "what I'd harden
+# for production" section. Revert to `type: pserv` (drop the free plan) if
+# that trade-off ever stops being acceptable.
+#
+# `web` still gets Render's private network hostname (`<name>:<port>`) like
+# any other service, so `api` talks to `rag-core` internally rather than
+# over its public URL.
+#
+# Prerequisites before applying this Blueprint in the Render dashboard:
+#   1. This repo pushed to a GitHub (or GitLab) remote Render can connect to.
+#   2. A Qdrant Cloud cluster (DIRECTION.md's chosen host) - you'll paste its
+#      URL + API key in as secrets below.
+#   3. Real ANTHROPIC_API_KEY / VOYAGE_API_KEY / COHERE_API_KEY, same as
+#      local dev's .env.
+#   4. Generate one shared secret for RAG_CORE_SHARED_SECRET (e.g.
+#      `openssl rand -hex 32`) and enter the *same* value for both services
+#      below - the api -> rag-core trust boundary depends on them matching.
+#
+# Every `sync: false` env var is left blank here on purpose - Render prompts
+# for a value per service when you create the Blueprint. Everything else
+# already has a sensible default value set directly below.
+
+services:
+  - name: rag-core
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/rag-core/Dockerfile
+    dockerContext: ./services/rag-core
+    healthCheckPath: /health
+    envVars:
+      - key: ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+
+      # --- api -> rag-core trust boundary (must match api's value below) ---
+      - key: RAG_CORE_SHARED_SECRET
+        sync: false
+
+      # --- Qdrant Cloud ---
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: knowledge_base
+
+      # --- AI providers ---
+      - key: EMBEDDING_PROVIDER
+        value: voyage
+      - key: EMBEDDING_MODEL
+        value: voyage-4-lite
+      - key: EMBEDDING_DIMENSIONS
+        value: "1024"
+      - key: VOYAGE_API_KEY
+        sync: false
+      # Free-tier Voyage rate-limit handling, live-calibrated - see
+      # app/providers/voyage.py and PROGRESS.md for how these were derived.
+      - key: VOYAGE_MAX_BATCH_TOKENS
+        value: "4000"
+      - key: VOYAGE_BATCH_DELAY_SECONDS
+        value: "21"
+      - key: RERANK_PROVIDER
+        value: cohere
+      - key: RERANK_MODEL
+        value: rerank-v3.5
+      - key: COHERE_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GENERATION_MODEL
+        value: claude-sonnet-5
+      - key: QUERY_REWRITE_MODEL
+        value: claude-haiku-4-5
+
+      # --- retrieval / cost-control knobs (DIRECTION.md defaults) ---
+      - key: RETRIEVAL_SCORE_FLOOR
+        value: "0.35"
+      - key: RETRIEVE_TOP_K
+        value: "20"
+      - key: RERANK_TOP_N
+        value: "5"
+
+      # --- hosted-demo ingestion gate: disabled by default per DIRECTION.md
+      # ("Upload disabled or behind a private passphrase/API key. Never an
+      # unrestricted public ingestion endpoint.") - the web demo's upload
+      # feature will show a disabled error on this deployment unless you
+      # flip this to "true" and also set INGEST_API_KEY here and on api. ---
+      - key: INGEST_ENABLED
+        value: "false"
+
+      # NOTE: Render's free web services have no persistent disk - the
+      # SQLite document registry (data/registry.db) and stored original
+      # files (data/storage/) reset on every deploy/restart. Qdrant Cloud
+      # itself is unaffected (separate, persistent service), but the
+      # registry's dedup/ingestion-status tracking is not durable on this
+      # plan. Acceptable for a portfolio demo; would need a paid disk (or a
+      # Postgres-backed registry - already an interface-swap away per
+      # DIRECTION.md) for anything that needs to remember state.
+
+  - name: api
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: ./services/api
+    healthCheckPath: /health
+    envVars:
+      - key: ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+
+      # Render's private network hostname for the rag-core service above -
+      # "web" services get one too, not just "pserv". Avoids a public
+      # round-trip for every internal call.
+      - key: RAG_CORE_URL
+        value: http://rag-core:8000
+      - key: RAG_CORE_SHARED_SECRET
+        sync: false
+
+      - key: INGEST_ENABLED
+        value: "false"
+
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX_QUERY
+        value: "20"
+      - key: RATE_LIMIT_MAX_INGEST
+        value: "5"
+      - key: MAX_UPLOAD_BYTES
+        value: "20971520"
+
+      # The deployed web frontend's origin (Vercel), for CORS - set once
+      # that's deployed. Until then this api won't accept browser requests
+      # from anywhere, which is the correct fail-closed default.
+      - key: WEB_ORIGIN
+        sync: false

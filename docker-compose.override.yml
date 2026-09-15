@@ -1,0 +1,32 @@
+# Dev-only overrides — applied automatically by `docker compose`.
+# Host port maps are bound to 127.0.0.1: local debugging only, never public.
+name: rag-agent
+
+services:
+  qdrant:
+    ports:
+      - "127.0.0.1:6333:6333"   # REST
+      - "127.0.0.1:6334:6334"   # gRPC
+
+  rag-core:
+    build:
+      target: dev
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./services/rag-core/app:/app/app
+      - ./services/rag-core/tests:/app/tests
+      - ./services/rag-core/eval:/app/eval   # golden set + results (Stage 8) - without this, `make eval`'s
+                                              # output only exists inside the ephemeral `--rm` container
+      - ./corpus:/corpus:ro   # local ingest testing target, e.g. {"path": "/corpus/sample"}
+    environment:
+      ENV: development
+
+  api:
+    build:
+      target: dev
+    volumes:
+      - ./services/api/src:/app/src
+      - ./services/api/test:/app/test
+    environment:
+      ENV: development

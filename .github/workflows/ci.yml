@@ -1,0 +1,45 @@
+name: ci
+
+# No secrets, no paid API calls. Builds the stack, runs unit tests, then brings
+# the stack up for integration tests against Qdrant (a free, self-hosted service).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env (CI-only, non-secret)
+        run: echo "RAG_CORE_SHARED_SECRET=ci-not-a-real-secret" > .env
+
+      - name: rag-core unit tests
+        run: docker compose run --rm --no-deps rag-core uv run --frozen pytest -v -m "not integration"
+
+      - name: api unit tests
+        run: docker compose run --rm --no-deps api npm test
+
+      - name: Start stack
+        run: docker compose up --build -d
+
+      - name: Wait for health
+        run: bash ./scripts/wait-for-health.sh
+
+      - name: Host-side health checks
+        run: bash ./scripts/healthcheck.sh
+
+      - name: Integration tests
+        run: |
+          docker compose run --rm --no-deps -e RUN_INTEGRATION=1 rag-core uv run --frozen pytest -v -m integration
+          docker compose run --rm --no-deps -e RUN_INTEGRATION=1 api npm test
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

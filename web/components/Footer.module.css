@@ -1,0 +1,10 @@
+.foot {
+  border-top: 1px solid var(--color-rule);
+  margin-top: var(--space-3xl);
+}
+
+.inner {
+  padding-block: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}

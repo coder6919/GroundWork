@@ -1,0 +1,102 @@
+# Demo corpus manifest.
+#
+# The corpus is NOT committed to this repository. `scripts/fetch_corpus.py`
+# reads this file and downloads sources into `corpus/files/` (gitignored). A
+# small committed sample lives under `corpus/sample/` so tests and CI can run
+# offline without network access.
+#
+# Per-source schema:
+#   id:          stable slug (used as the document id prefix / output filename)
+#   title:       human-readable name
+#   source_url:  canonical raw-content download URL
+#   type:        markdown | html | pdf | pdf_scanned
+#   license:     "CC-BY-SA-4.0" | "CC-BY-4.0" | "public-domain" | ...
+#   attribution: required attribution string for CC-BY* sources
+#   notes:       which ingestion edge case this document exercises
+
+version: 1
+
+# Primary corpus (Stage 1): a small slice of the GitLab Handbook, CC BY-SA 4.0.
+# Real, messy, structured company-policy Markdown - headings, tables, links,
+# long-form prose. Chosen per DIRECTION.md's corpus decision. Supplemental
+# public-domain PDFs (tables, scanned pages, odd encodings) are added in
+# Stage 4 alongside PDF/OCR support.
+sources:
+  - id: gitlab-people-policies-index
+    title: "People Policies"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/people-policies/_index.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "index/landing page - short, tests near-trivial documents"
+
+  - id: gitlab-people-policies-usa
+    title: "People Policies - GitLab Inc (USA)"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/people-policies/inc-usa.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "very long, deeply nested headings - stresses heading-path chunking"
+
+  - id: gitlab-leave-of-absence-index
+    title: "Leave of Absence"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/people-policies/leave-of-absence/_index.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "overlaps in topic with gitlab-leave-of-absence-us - dedup/versioning candidate"
+
+  - id: gitlab-leave-of-absence-us
+    title: "Leave of Absence - US"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/people-policies/leave-of-absence/us.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "country-specific policy detail - good source for narrow factual eval questions"
+
+  - id: gitlab-hiring-index
+    title: "Hiring"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/hiring/_index.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "onboarding/hiring narrative - matches the spec's HR framing"
+
+  - id: gitlab-hiring-conducting-interview
+    title: "Conducting a GitLab Interview"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/hiring/conducting-a-gitlab-interview.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "process doc with lists and links"
+
+  - id: gitlab-hiring-referral-process
+    title: "Referral Process"
+    source_url: "https://gitlab.com/gitlab-com/content-sites/handbook/-/raw/main/content/handbook/hiring/referral-process.md"
+    type: markdown
+    license: CC-BY-SA-4.0
+    attribution: "GitLab Handbook, GitLab Inc., CC BY-SA 4.0 (handbook.gitlab.com)"
+    notes: "shorter procedural doc - good source for straightforward factual eval questions"
+
+# Supplemental PDFs (Stage 4). U.S. federal agency works are public domain
+# (17 U.S.C. Section 105) - cleanest possible licensing, no attribution required.
+#
+# NOTE: only one verified real source is listed so far. A genuinely scanned
+# (image-only) PDF and an odd-text-encoding PDF were not sourced here - rather
+# than guess at an unverified URL, the OCR and encoding-normalization code
+# paths are instead proven against the synthetic fixtures in corpus/sample/
+# (generated via services/rag-core/scripts/generate_sample_pdf.py). Finding
+# real-world examples of both remains a documented follow-up, not a Stage 4
+# blocker - the engineering they'd exercise is already built and tested.
+  - id: eeoc-know-your-rights
+    title: "Know Your Rights: Workplace Discrimination is Illegal"
+    source_url: "https://www.eeoc.gov/sites/default/files/2023-06/22-088_EEOC_KnowYourRights6.12ScreenRdr.pdf"
+    type: pdf
+    license: public-domain
+    attribution: "U.S. Equal Employment Opportunity Commission (public domain, 17 U.S.C. Section 105)"
+    notes: >
+      Verified via app.ingestion.pdf_loader: 2 pages, real text layer (not
+      scanned, ~3950 chars/page), no tables. Its font encoding mangles curly
+      apostrophes into a replacement character ("you've" -> "you�ve") -
+      a real, organically-found example of the "odd encoding" PDF problem,
+      not a bug in our extraction code.

@@ -1,0 +1,38 @@
+# --- env / secrets (never commit) ---
+.env
+.env.*
+!.env.example
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- node ---
+node_modules/
+dist/
+npm-debug.log*
+.next/
+*.tsbuildinfo
+
+# --- local data / volumes ---
+# SQLite registry + storage/ (original files), see SQLITE_PATH / STORAGE_DIR
+services/rag-core/data/
+corpus/files/
+# generated per-run eval output (Stage 8) - regenerate with `make eval`
+services/rag-core/eval/results/
+
+# --- session continuity docs (working notes, not for the public repo) ---
+PROGRESS.md
+DIRECTION.md
+FEATURES.md
+
+# --- os / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
