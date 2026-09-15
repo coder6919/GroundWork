@@ -12,9 +12,17 @@
 # for production" section. Revert to `type: pserv` (drop the free plan) if
 # that trade-off ever stops being acceptable.
 #
-# `web` still gets Render's private network hostname (`<name>:<port>`) like
-# any other service, so `api` talks to `rag-core` internally rather than
-# over its public URL.
+# `web` services DO get a private-network hostname (`<name>:<port>`) in
+# principle - but confirmed live (see PROGRESS.md): Render's *free* web
+# instances can send private-network requests but cannot receive them, so
+# api -> rag-core over that internal hostname silently fails ("fetch
+# failed") on the free plan both are on here. api's RAG_CORE_URL is
+# therefore rag-core's public HTTPS URL instead (sync: false below, filled
+# in with the actual assigned URL after rag-core's first deploy - Render
+# only assigns it then). Traffic still goes over rag-core's shared-secret
+# auth boundary either way, so this isn't a new exposure versus the
+# internal-hostname plan - just an extra public hop. Switch back to the
+# internal hostname if either service ever moves to a paid instance type.
 #
 # Prerequisites before applying this Blueprint in the Render dashboard:
 #   1. This repo pushed to a GitHub (or GitLab) remote Render can connect to.
@@ -122,11 +130,13 @@ services:
       - key: LOG_LEVEL
         value: info
 
-      # Render's private network hostname for the rag-core service above -
-      # "web" services get one too, not just "pserv". Avoids a public
-      # round-trip for every internal call.
+      # rag-core's public HTTPS URL - NOT the private-network hostname
+      # (free web instances can't receive private-network requests, only
+      # send them; see the note at the top of this file). Render only
+      # assigns this URL once rag-core has been deployed at least once, so
+      # you'll fill it in after that, not during the first Blueprint apply.
       - key: RAG_CORE_URL
-        value: http://rag-core:8000
+        sync: false
       - key: RAG_CORE_SHARED_SECRET
         sync: false
 
